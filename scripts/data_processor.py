@@ -9,4 +9,6 @@ with open(input_file, "r") as txt_file, open(output_file, "w", newline='') as cs
     
     for line in txt_file:
         parts = line.strip().split("\t")
+        if parts[1] == "NA":
+            parts[1] = "NAT"
         csv_writer.writerow(parts)
