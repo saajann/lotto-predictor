@@ -55,7 +55,7 @@ The Lotto Predictor project aims to:
 lotto-predictor/
 ├── data/
 │   ├── raw/ (raw data downloaded from official sources)
-│   ├── processed/ (cleaned and structured data in CSV/Parquet format)
+│   ├── processed/ (cleaned and structured data in CSV format)
 │   └── historical_stats/ (aggregated statistics)
 ├── scripts/
 │   ├── data_collection.py (automated data download)
@@ -75,7 +75,7 @@ lotto-predictor/
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/user/lotto-predictor
+   git clone https://github.com/saajann/lotto-predictor
    cd lotto-predictor
    ```
 
