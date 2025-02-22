@@ -18,7 +18,7 @@ def main():
     # Sidebar menu
     st.sidebar.title("Menu")
     option = st.sidebar.radio("Choose an option:", 
-                              ("View Draws by Date", "Most Frequent Numbers", "Least Frequent Numbers"))
+                              ("View Draws by Date", "Most/Least Frequent Numbers"))
     
     if option == "View Draws by Date":
         available_dates = lotto_data['date'].dt.date.unique()
@@ -51,39 +51,69 @@ def main():
         else:
             st.warning("No draws found for the selected date.")
     
-    elif option == "Most Frequent Numbers":
-        st.write("Most Frequent Numbers (last 1000 extractions):")
+    elif option == "Most/Least Frequent Numbers":
+        st.write("Most/Least Frequent Numbers (last 1000 extractions):")
         
         wheels = most_frequent['wheel'].unique()
         
         selected_wheel = st.selectbox("Select Wheel", wheels)
         
-        wheel_data = most_frequent[most_frequent['wheel'] == selected_wheel]
-        
+        # Most Frequent Numbers
         st.write(f"Most frequent numbers for wheel **{selected_wheel}**:")
         
+        most_wheel_data = most_frequent[most_frequent['wheel'] == selected_wheel]
+        
         cols = st.columns(5)
-        for idx, (_, row) in enumerate(wheel_data.iterrows()):
+        for idx, (_, row) in enumerate(most_wheel_data.iterrows()):
             with cols[idx % 5]:  
                 st.markdown(f"**Number {row['number']}**")
                 st.write(f"Frequency: {row['frequency']}")
-    
-    elif option == "Least Frequent Numbers":
-        st.write("Least Frequent Numbers (last 1000 extractions):")
         
-        wheels = least_frequent['wheel'].unique()
-        
-        selected_wheel = st.selectbox("Select Wheel", wheels)
-        
-        wheel_data = least_frequent[least_frequent['wheel'] == selected_wheel]
-        
+        # Least Frequent Numbers
         st.write(f"Least frequent numbers for wheel **{selected_wheel}**:")
         
+        least_wheel_data = least_frequent[least_frequent['wheel'] == selected_wheel]
+        
         cols = st.columns(5)
-        for idx, (_, row) in enumerate(wheel_data.iterrows()):
+        for idx, (_, row) in enumerate(least_wheel_data.iterrows()):
             with cols[idx % 5]:  
                 st.markdown(f"**Number {row['number']}**")
                 st.write(f"Frequency: {row['frequency']}")
+        
+        # Last N Draws
+        st.write(f"Last draws for wheel **{selected_wheel}**:")
+        
+        num_draws = st.slider("Select number of last draws to display", min_value=1, max_value=10, value=3)
+        
+        last_draws = lotto_data[lotto_data['wheel'] == selected_wheel].sort_values(by='date', ascending=False).head(num_draws)
+        
+        if not last_draws.empty:
+            st.write("### Last Draws")
+            
+            most_frequent_numbers = most_frequent[most_frequent['wheel'] == selected_wheel]['number'].tolist()
+            least_frequent_numbers = least_frequent[least_frequent['wheel'] == selected_wheel]['number'].tolist()
+
+            def highlight_frequent(val):
+                if val in most_frequent_numbers:
+                    return f"{val}*"
+                if val in least_frequent_numbers:
+                    return f"{val}**"
+                return val
+            
+            last_draws = last_draws[['date', 'n1', 'n2', 'n3', 'n4', 'n5']].rename(columns={
+            'date': 'Date',
+            'n1': 'Number 1',
+            'n2': 'Number 2',
+            'n3': 'Number 3',
+            'n4': 'Number 4',
+            'n5': 'Number 5'
+            })
+            
+            last_draws = last_draws.applymap(highlight_frequent)
+            
+            st.table(last_draws)
+        else:
+            st.warning("No draws found for the selected wheel.")
 
 if __name__ == '__main__':
     main()
