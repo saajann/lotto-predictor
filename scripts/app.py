@@ -1,5 +1,8 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
+
+frequencies = pd.read_csv('data/historical_stats/numbers_frequency.csv')
 
 @st.cache_data
 def load_data():
@@ -52,11 +55,31 @@ def main():
             st.warning("No draws found for the selected date.")
     
     elif option == "Most/Least Frequent Numbers":
-        st.write("Most/Least Frequent Numbers (last 1000 extractions):")
-        
+
+        st.write("Most/Least Frequent Numbers (last 100 extractions):")
+
         wheels = most_frequent['wheel'].unique()
         
         selected_wheel = st.selectbox("Select Wheel", wheels)
+        
+        st.write(f"Frequency histogram for wheel **{selected_wheel}**:")
+        
+        wheel_frequencies = frequencies[frequencies['wheel'] == selected_wheel]
+        
+        freq_dict = dict(zip(wheel_frequencies['number'], wheel_frequencies['frequency']))
+        
+        all_numbers = range(1, 91)
+        all_frequencies = [freq_dict.get(num, 0) for num in all_numbers]
+        
+        fig, ax = plt.subplots()
+        ax.bar(all_numbers, all_frequencies, color='skyblue')
+        ax.set_xlabel('Number')
+        ax.set_ylabel('Frequency')
+        ax.set_title(f'Frequency of Numbers for Wheel {selected_wheel}')
+        ax.set_xticks(range(1, 91, 5))
+        ax.grid(axis='y', linestyle='--', alpha=0.7)
+        
+        st.pyplot(fig)
         
         # Most Frequent Numbers
         st.write(f"Most frequent numbers for wheel **{selected_wheel}**:")
