@@ -1,29 +1,84 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import requests
+import zipfile
+import csv
+import os
+
+# Ensure the necessary directories exist
+os.makedirs('data/raw', exist_ok=True)
+os.makedirs('data/processed', exist_ok=True)
+os.makedirs('data/historical_stats', exist_ok=True)
 
 frequencies = pd.read_csv('data/historical_stats/numbers_frequency.csv')
 
 @st.cache_data
 def load_data():
-    lotto_data = pd.read_csv('data/processed/lotto_historical.csv')
-    most_frequent = pd.read_csv('data/historical_stats/most_frequent.csv')
-    least_frequent = pd.read_csv('data/historical_stats/least_frequent.csv')
+    try:
+        lotto_data = pd.read_csv('data/processed/lotto_historical.csv')
+    except (FileNotFoundError, pd.errors.EmptyDataError):
+        lotto_data = pd.DataFrame(columns=['date', 'wheel', 'n1', 'n2', 'n3', 'n4', 'n5'])
+    
+    try:
+        most_frequent = pd.read_csv('data/historical_stats/most_frequent.csv')
+    except (FileNotFoundError, pd.errors.EmptyDataError):
+        most_frequent = pd.DataFrame(columns=['wheel', 'number', 'frequency'])
+    
+    try:
+        least_frequent = pd.read_csv('data/historical_stats/least_frequent.csv')
+    except (FileNotFoundError, pd.errors.EmptyDataError):
+        least_frequent = pd.DataFrame(columns=['wheel', 'number', 'frequency'])
+    
     return lotto_data, most_frequent, least_frequent
 
 lotto_data, most_frequent, least_frequent = load_data()
 
-lotto_data['date'] = pd.to_datetime(lotto_data['date'])
+if not lotto_data.empty:
+    lotto_data['date'] = pd.to_datetime(lotto_data['date'])
+
+def refresh_data():
+    URL = "https://www.igt.it/STORICO_ESTRAZIONI_LOTTO/storico01-oggi.zip"
+    response = requests.get(URL)
+    with open("data/raw/lotto_historical.zip", "wb") as f:
+        f.write(response.content)
+
+    with zipfile.ZipFile("data/raw/lotto_historical.zip", 'r') as zip_ref:
+        zip_ref.extractall("data/raw/")
+    
+    input_file = "data/raw/storico01-oggi.txt"
+    output_file = "data/processed/lotto_historical.csv"
+
+    with open(input_file, "r") as txt_file, open(output_file, "w", newline='') as csv_file:
+        csv_writer = csv.writer(csv_file)
+        csv_writer.writerow(["date", "wheel", "n1", "n2", "n3", "n4", "n5"])
+        
+        for line in txt_file:
+            parts = line.strip().split("\t")
+            if parts[1] == "NA":
+                parts[1] = "NAT"
+            csv_writer.writerow(parts)
+    
+    # Clear cache to load new data
+    st.cache_data.clear()
 
 def main():
     st.title('Lotto Draws Visualizer')
     
     # Sidebar menu
     st.sidebar.title("Menu")
+    if st.sidebar.button('Refresh Data'):
+        refresh_data()
+        st.sidebar.success("Data refreshed successfully!")
+    
     option = st.sidebar.radio("Choose an option:", 
                               ("View Draws by Date", "Most/Least Frequent Numbers"))
     
     if option == "View Draws by Date":
+        if lotto_data.empty:
+            st.warning("No data available. Please refresh the data.")
+            return
+        
         available_dates = lotto_data['date'].dt.date.unique()
         available_years = sorted(list({date.year for date in available_dates}))
         available_months = sorted(list({date.month for date in available_dates}))
@@ -55,6 +110,9 @@ def main():
             st.warning("No draws found for the selected date.")
     
     elif option == "Most/Least Frequent Numbers":
+        if most_frequent.empty or least_frequent.empty:
+            st.warning("No frequency data available. Please refresh the data.")
+            return
 
         st.write("Most/Least Frequent Numbers (last 100 extractions):")
 
