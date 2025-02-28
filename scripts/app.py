@@ -5,6 +5,7 @@ import requests
 import zipfile
 import csv
 import os
+import numpy as np
 
 # Ensure the necessary directories exist
 os.makedirs('data/raw', exist_ok=True)
@@ -72,7 +73,7 @@ def main():
         st.sidebar.success("Data refreshed successfully!")
     
     option = st.sidebar.radio("Choose an option:", 
-                              ("View Draws by Date", "Most/Least Frequent Numbers"))
+                              ("View Draws by Date", "Most/Least Frequent Numbers", "Number Grid Analysis"))
     
     if option == "View Draws by Date":
         if lotto_data.empty:
@@ -195,6 +196,136 @@ def main():
             st.table(last_draws)
         else:
             st.warning("No draws found for the selected wheel.")
+
+    elif option == "Number Grid Analysis":
+        if lotto_data.empty or most_frequent.empty or least_frequent.empty:
+            st.warning("No data available. Please refresh the data.")
+            return
+        
+        st.write("## Number Grid Analysis")
+        
+        wheels = lotto_data['wheel'].unique()
+        selected_wheel = st.selectbox("Select Wheel", wheels, key="grid_wheel_selector")
+        
+        # Get the last 10 draws for the selected wheel
+        last_10_draws = lotto_data[lotto_data['wheel'] == selected_wheel].sort_values(by='date', ascending=False).head(10)
+        
+        # Collect all drawn numbers from the last 10 extractions
+        recent_numbers = []
+        for col in ['n1', 'n2', 'n3', 'n4', 'n5']:
+            recent_numbers.extend(last_10_draws[col].tolist())
+        recent_numbers = [int(n) for n in recent_numbers]
+        
+        # Get the 10 most frequent numbers for the wheel
+        top_10_frequent = most_frequent[most_frequent['wheel'] == selected_wheel].head(10)['number'].tolist()
+        top_10_frequent = [int(n) for n in top_10_frequent]
+        
+        # Get the 10 least frequent numbers for the wheel
+        bottom_10_frequent = least_frequent[least_frequent['wheel'] == selected_wheel].head(10)['number'].tolist()
+        bottom_10_frequent = [int(n) for n in bottom_10_frequent]
+        
+        # Color definitions - using a more harmonious palette for lottery visualization
+        colors = {
+            'neutral': '#f5f5f5',  # Light gray for neutral numbers
+            'recent': '#4caf50',   # Green for recently drawn numbers
+            'most_freq': '#1e88e5', # Blue for most frequent numbers
+            'least_freq': '#f44336', # Red for least frequent numbers
+            'recent_most': '#8bc34a',  # Light green for recent + most frequent
+            'recent_least': '#ff9800', # Orange for recent + least frequent
+            'text_dark': '#212121',   # Dark text for light backgrounds
+            'text_light': '#ffffff'   # Light text for dark backgrounds
+        }
+        
+        # Create a grid of numbers from 1 to 90
+        st.write(f"### Number Grid for Wheel {selected_wheel}")
+        
+        # Legend with colored boxes
+        st.write("### Legend:")
+        legend_col1, legend_col2, legend_col3 = st.columns(3)
+        
+        with legend_col1:
+            st.markdown(f"""
+            <div style='display:flex;align-items:center;margin-bottom:10px'>
+                <div style='background-color:{colors["recent"]};width:20px;height:20px;margin-right:10px'></div>
+                <div>Recently drawn (last 10 extractions)</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown(f"""
+            <div style='display:flex;align-items:center;margin-bottom:10px'>
+                <div style='background-color:{colors["recent_most"]};width:20px;height:20px;margin-right:10px'></div>
+                <div>Recently drawn + Most frequent</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with legend_col2:
+            st.markdown(f"""
+            <div style='display:flex;align-items:center;margin-bottom:10px'>
+                <div style='background-color:{colors["most_freq"]};width:20px;height:20px;margin-right:10px'></div>
+                <div>Most frequent numbers</div>
+            </div>
+            
+            <div style='display:flex;align-items:center;margin-bottom:10px'>
+                <div style='background-color:{colors["recent_least"]};width:20px;height:20px;margin-right:10px'></div>
+                <div>Recently drawn + Least frequent</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with legend_col3:
+            st.markdown(f"""
+            <div style='display:flex;align-items:center;margin-bottom:10px'>
+                <div style='background-color:{colors["least_freq"]};width:20px;height:20px;margin-right:10px'></div>
+                <div>Least frequent numbers</div>
+            </div>
+            
+            <div style='display:flex;align-items:center;margin-bottom:10px'>
+                <div style='background-color:{colors["neutral"]};width:20px;height:20px;margin-right:10px'></div>
+                <div>Other numbers</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Create the grid with 9 rows and 10 columns
+        grid_rows = 9
+        grid_cols = 10
+        
+        for i in range(grid_rows):
+            cols = st.columns(grid_cols)
+            for j in range(grid_cols):
+                number = i * grid_cols + j + 1
+                if number <= 90:
+                    # Determine cell color and content based on the number's characteristics
+                    is_recent = number in recent_numbers
+                    is_most_frequent = number in top_10_frequent
+                    is_least_frequent = number in bottom_10_frequent
+                    
+                    bg_color = colors['neutral']  # Default color
+                    text_color = colors['text_dark']  # Default text color
+                    symbol = ""
+                    
+                    # Determine the color based on the combination of conditions
+                    if is_recent and is_most_frequent:
+                        bg_color = colors['recent_most']
+                        text_color = colors['text_dark']
+                        symbol = "*"
+                    elif is_recent and is_least_frequent:
+                        bg_color = colors['recent_least']
+                        text_color = colors['text_dark']
+                        symbol = "†"
+                    elif is_recent:
+                        bg_color = colors['recent']
+                        text_color = colors['text_light']
+                    elif is_most_frequent:
+                        bg_color = colors['most_freq']
+                        text_color = colors['text_light']
+                    elif is_least_frequent:
+                        bg_color = colors['least_freq']
+                        text_color = colors['text_light']
+                    
+                    # Create the cell with appropriate styling
+                    cols[j].markdown(
+                        f"<div style='background-color:{bg_color};color:{text_color};padding:10px;text-align:center;border-radius:4px;font-weight:bold;'>{number}{symbol}</div>",
+                        unsafe_allow_html=True
+                    )
 
 if __name__ == '__main__':
     main()
