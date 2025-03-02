@@ -13,8 +13,6 @@ os.makedirs('data/raw', exist_ok=True)
 os.makedirs('data/processed', exist_ok=True)
 os.makedirs('data/historical_stats', exist_ok=True)
 
-frequencies = pd.read_csv('data/historical_stats/numbers_frequency.csv')
-
 @st.cache_data
 def load_data():
     try:
@@ -32,12 +30,40 @@ def load_data():
     except (FileNotFoundError, pd.errors.EmptyDataError):
         least_frequent = pd.DataFrame(columns=['wheel', 'number', 'frequency'])
     
-    return lotto_data, most_frequent, least_frequent
+    try:
+        frequencies = pd.read_csv('data/historical_stats/numbers_frequency.csv')
+    except (FileNotFoundError, pd.errors.EmptyDataError):
+        frequencies = pd.DataFrame(columns=['wheel', 'number', 'frequency'])
+    
+    return lotto_data, most_frequent, least_frequent, frequencies
 
-lotto_data, most_frequent, least_frequent = load_data()
+lotto_data, most_frequent, least_frequent, frequencies = load_data()
 
 if not lotto_data.empty:
     lotto_data['date'] = pd.to_datetime(lotto_data['date'])
+
+def calculate_frequencies():
+    last_100_extractions = lotto_data.groupby('wheel').tail(100)
+    calculated_frequencies = last_100_extractions.melt(
+        id_vars=['wheel'], 
+        value_vars=['n1', 'n2', 'n3', 'n4', 'n5'],
+        var_name='num_pos', 
+        value_name='number'
+    ).groupby(['wheel', 'number']).size().reset_index(name='frequency')
+    
+    calculated_most_frequent = calculated_frequencies.groupby('wheel').apply(
+        lambda x: x.nlargest(10, 'frequency')
+    ).reset_index(drop=True)
+    
+    calculated_least_frequent = calculated_frequencies.groupby('wheel').apply(
+        lambda x: x.nsmallest(10, 'frequency')
+    ).reset_index(drop=True)
+    
+    calculated_most_frequent.to_csv('data/historical_stats/most_frequent.csv', index=False)
+    calculated_least_frequent.to_csv('data/historical_stats/least_frequent.csv', index=False)
+    calculated_frequencies.to_csv('data/historical_stats/numbers_frequency.csv', index=False)
+    
+    return calculated_frequencies, calculated_most_frequent, calculated_least_frequent
 
 def refresh_data():
     URL = "https://www.igt.it/STORICO_ESTRAZIONI_LOTTO/storico01-oggi.zip"
@@ -80,6 +106,12 @@ def refresh_data():
             elif parts[1] == "RN":
                 parts[1] = "NAZIONALE"
             csv_writer.writerow(parts)
+    
+    global lotto_data, most_frequent, least_frequent, frequencies
+    lotto_data = pd.read_csv('data/processed/lotto_historical.csv')
+    lotto_data['date'] = pd.to_datetime(lotto_data['date'])
+    
+    frequencies, most_frequent, least_frequent = calculate_frequencies()
     
     st.cache_data.clear()
 
@@ -127,20 +159,16 @@ def main():
             if not filtered_data.empty:
                 st.markdown("<h4 style='text-align: center;'>Numbers drawn on {}</h4>".format(selected_date), unsafe_allow_html=True)
                 
-                # Create a table with wheel names in a column and numbers beside them
                 table_html = "<table style='width: 80%; margin: 0 auto; border-collapse: collapse;'>"
                 table_html += "<tr><th style='border: 1px solid #ddd; padding: 8px; text-align: left;'>Wheel</th>"
                 
-                # Add column headers for numbers
                 for i in range(1, 6):
                     table_html += f"<th style='border: 1px solid #ddd; padding: 8px; text-align: center;'>Number {i}</th>"
                 table_html += "</tr>"
                 
-                # Add rows for each wheel
                 for _, wheel_data in filtered_data.iterrows():
                     table_html += f"<tr><td style='border: 1px solid #ddd; padding: 8px; font-weight: bold;'>{wheel_data['wheel']}</td>"
                     
-                    # Add cells for each number
                     for col in ['n1', 'n2', 'n3', 'n4', 'n5']:
                         if pd.notna(wheel_data[col]):
                             table_html += f"<td style='border: 1px solid #ddd; padding: 8px; text-align: center;'>{wheel_data[col]}</td>"
@@ -192,14 +220,12 @@ def main():
             with col2:
                 st.pyplot(fig)
             
-            # Simplified frequency numbers display
             col1, col2 = st.columns(2)
             
             with col1:
                 st.markdown("<h4 style='text-align: center;'>Most Frequent Numbers</h4>", unsafe_allow_html=True)
                 most_wheel_data = most_frequent[most_frequent['wheel'] == selected_wheel].head(5)
                 
-                # Create a simple table for most frequent numbers
                 most_table = "<table style='width: 100%; border-collapse: collapse;'>"
                 most_table += "<tr><th style='border: 1px solid #ddd; padding: 8px; background-color: #1e88e5; color: white;'>Number</th>"
                 most_table += "<th style='border: 1px solid #ddd; padding: 8px; background-color: #1e88e5; color: white;'>Frequency</th></tr>"
@@ -215,7 +241,6 @@ def main():
                 st.markdown("<h4 style='text-align: center;'>Least Frequent Numbers</h4>", unsafe_allow_html=True)
                 least_wheel_data = least_frequent[least_frequent['wheel'] == selected_wheel].head(5)
                 
-                # Create a simple table for least frequent numbers
                 least_table = "<table style='width: 100%; border-collapse: collapse;'>"
                 least_table += "<tr><th style='border: 1px solid #ddd; padding: 8px; background-color: #f44336; color: white;'>Number</th>"
                 least_table += "<th style='border: 1px solid #ddd; padding: 8px; background-color: #f44336; color: white;'>Frequency</th></tr>"
@@ -244,7 +269,7 @@ def main():
                     least_freq_nums = least_frequent[least_frequent['wheel'] == selected_wheel]['number'].tolist()
                     
                     for col in ['n1', 'n2', 'n3', 'n4', 'n5']:
-                        if col in draw and pd.notna(draw[col]):  # Check if column exists and value is not NA
+                        if col in draw and pd.notna(draw[col]):
                             num = draw[col]
                             if int(num) in most_freq_nums:
                                 numbers_html += f"<div style='background-color:#1e88e5;color:#ffffff;padding:15px;text-align:center;border-radius:4px;font-weight:bold;width:50px'>{num}</div>"
@@ -268,12 +293,20 @@ def main():
             with col2:
                 wheels = lotto_data['wheel'].unique()
                 selected_wheel = st.selectbox("Select Wheel", wheels, key="grid_wheel_selector")
+                
+                num_draws_to_consider = st.slider(
+                    "Select number of draws to consider", 
+                    min_value=1, 
+                    max_value=20, 
+                    value=10, 
+                    key="grid_draws_slider"
+                )
             
-            last_10_draws = lotto_data[lotto_data['wheel'] == selected_wheel].sort_values(by='date', ascending=False).head(10)
+            last_n_draws = lotto_data[lotto_data['wheel'] == selected_wheel].sort_values(by='date', ascending=False).head(num_draws_to_consider)
             
             recent_numbers = []
             for col in ['n1', 'n2', 'n3', 'n4', 'n5']:
-                recent_numbers.extend(last_10_draws[col].tolist())
+                recent_numbers.extend(last_n_draws[col].tolist())
             recent_numbers = [int(n) for n in recent_numbers]
             
             top_10_frequent = most_frequent[most_frequent['wheel'] == selected_wheel].head(10)['number'].tolist()
