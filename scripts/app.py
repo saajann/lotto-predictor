@@ -65,6 +65,28 @@ def calculate_frequencies():
     
     return calculated_frequencies, calculated_most_frequent, calculated_least_frequent
 
+def calculate_delays():
+    today = pd.Timestamp.now().floor('D')
+    delays = {}
+    
+    for wheel in lotto_data['wheel'].unique():
+        wheel_data = lotto_data[lotto_data['wheel'] == wheel].sort_values('date', ascending=False)
+        wheel_delays = {}
+        
+        for number in range(1, 91):
+            for _, row in wheel_data.iterrows():
+                if number in [row['n1'], row['n2'], row['n3'], row['n4'], row['n5']]:
+                    last_date = row['date']
+                    days_since = (today - last_date).days
+                    wheel_delays[number] = days_since
+                    break
+            else:
+                wheel_delays[number] = 999
+        
+        delays[wheel] = wheel_delays
+    
+    return delays
+
 def refresh_data():
     URL = "https://www.igt.it/STORICO_ESTRAZIONI_LOTTO/storico01-oggi.zip"
     response = requests.get(URL)
@@ -134,8 +156,7 @@ def main():
             refresh_data()
             st.success("Data refreshed successfully!")
     
-    tab1, tab2, tab3 = st.tabs(["Draws by Date", "Frequency Analysis", "Number Grid"])
-    
+    tab1, tab2, tab3, tab4 = st.tabs(["Draws by Date", "Frequency Analysis", "Number Grid", "Delays Analysis"])    
     with tab1:
         if lotto_data.empty:
             st.warning("No data available. Please refresh the data.")
@@ -419,6 +440,75 @@ def main():
                                 f"<div style='background-color:{bg_color};color:{text_color};padding:10px;text-align:center;border-radius:4px;font-weight:bold;'>{number}{symbol}</div>",
                                 unsafe_allow_html=True
                             )
+
+    with tab4:
+        st.markdown("<h3 style='text-align: center;'>Delays Analysis</h3>", unsafe_allow_html=True)
+        if lotto_data.empty:
+            st.warning("No data available. Please refresh the data.")
+        else:
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                wheels = lotto_data['wheel'].unique()
+                selected_wheel = st.selectbox("Select a wheel", wheels, key="delay_wheel_selector")
+            
+            delays = calculate_delays()
+            wheel_delays = delays[selected_wheel]
+            
+            delay_df = pd.DataFrame({
+                'Number': list(wheel_delays.keys()),
+                'Delay (days)': list(wheel_delays.values())
+            }).sort_values('Delay (days)', ascending=False)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("<h4 style='text-align: center;'>Numbers with the Longest Delays</h4>", unsafe_allow_html=True)
+                top_delays = delay_df.head(10)
+                
+                delay_table = "<table style='width: 100%; border-collapse: collapse;'>"
+                delay_table += "<tr><th style='border: 1px solid #ddd; padding: 8px; background-color: #f44336; color: white;'>Number</th>"
+                delay_table += "<th style='border: 1px solid #ddd; padding: 8px; background-color: #f44336; color: white;'>Delay (days)</th></tr>"
+                
+                for _, row in top_delays.iterrows():
+                    delay_table += f"<tr><td style='border: 1px solid #ddd; padding: 8px; text-align: center;'>{row['Number']}</td>"
+                    delay_table += f"<td style='border: 1px solid #ddd; padding: 8px; text-align: center;'>{row['Delay (days)']}</td></tr>"
+                
+                delay_table += "</table>"
+                st.markdown(delay_table, unsafe_allow_html=True)
+                
+            with col2:
+                st.markdown("<h4 style='text-align: center;'>Recently Drawn Numbers</h4>", unsafe_allow_html=True)
+                recent_numbers = delay_df.tail(10).sort_values('Delay (days)')
+                
+                recent_table = "<table style='width: 100%; border-collapse: collapse;'>"
+                recent_table += "<tr><th style='border: 1px solid #ddd; padding: 8px; background-color: #4caf50; color: white;'>Number</th>"
+                recent_table += "<th style='border: 1px solid #ddd; padding: 8px; background-color: #4caf50; color: white;'>Delay (days)</th></tr>"
+                
+                for _, row in recent_numbers.iterrows():
+                    recent_table += f"<tr><td style='border: 1px solid #ddd; padding: 8px; text-align: center;'>{row['Number']}</td>"
+                    recent_table += f"<td style='border: 1px solid #ddd; padding: 8px; text-align: center;'>{row['Delay (days)']}</td></tr>"
+                
+                recent_table += "</table>"
+                st.markdown(recent_table, unsafe_allow_html=True)
+            
+            st.markdown("<h4 style='text-align: center;'>Delay Chart</h4>", unsafe_allow_html=True)
+            
+            fig, ax = plt.subplots(figsize=(12, 6))
+            
+            normalized_delays = delay_df['Delay (days)'] / delay_df['Delay (days)'].max()
+            colors = plt.cm.RdYlGn_r(normalized_delays)
+            
+            bars = ax.bar(delay_df['Number'], delay_df['Delay (days)'], color=colors)
+            
+            ax.set_xlabel('Number')
+            ax.set_ylabel('Delay (days)')
+            ax.set_title(f'Number Delays for {selected_wheel} Wheel')
+            ax.set_xticks(range(1, 91, 5))
+            ax.grid(axis='y', linestyle='--', alpha=0.7)
+            
+            col1, col2, col3 = st.columns([1, 10, 1])
+            with col2:
+                st.pyplot(fig)
 
 if __name__ == '__main__':
     main()
