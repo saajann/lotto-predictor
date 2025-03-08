@@ -140,13 +140,13 @@ def refresh_data():
 def main():
     st.markdown("<h1 style='text-align: center;'>Lotto Draws Visualizer</h1>", unsafe_allow_html=True)
 
-    # Display last update date
     if not lotto_data.empty:
         last_update_date = lotto_data['date'].max().strftime('%B %d, %Y')
+        
         st.markdown(
-            f"<div style='text-align: center; padding: 10px; background-color: #f0f2f6; border-radius: 5px; margin-bottom: 20px;'>"
+            f"<div style='text-align: center; padding: 10px; background-color: #1e88e5; color: white; border-radius: 5px; margin-bottom: 20px;'>"
             f"<b>Last data update:</b> {last_update_date}"
-            f"</div>", 
+            f"</div>",
             unsafe_allow_html=True
         )
     
