@@ -313,6 +313,219 @@ def main():
                     st.markdown(numbers_html, unsafe_allow_html=True)
             else:
                 st.warning("No draws found for the selected wheel.")
+            
+            st.markdown("<hr>", unsafe_allow_html=True)
+            st.markdown("<h3 style='text-align: center;'>Pattern Analysis</h3>", unsafe_allow_html=True)
+
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                pattern_draws = st.slider("Number of draws to analyze patterns", 
+                                        min_value=10, 
+                                        max_value=100, 
+                                        value=30,
+                                        key="pattern_slider")
+
+            wheel_data = lotto_data[lotto_data['wheel'] == selected_wheel].sort_values(by='date', ascending=False).head(pattern_draws)
+
+            if not wheel_data.empty:
+                total_draws = len(wheel_data)
+                odd_even_ratios = []
+                high_low_ratios = []
+                consecutive_counts = []
+                decade_distributions = {f"{i}-{i+9}": 0 for i in range(1, 91, 10)}
+                
+                for _, draw in wheel_data.iterrows():
+                    numbers = [draw[f'n{i}'] for i in range(1, 6)]
+                    numbers = [int(n) for n in numbers if pd.notna(n)]
+                    
+                    odd_count = sum(1 for n in numbers if n % 2 == 1)
+                    even_count = len(numbers) - odd_count
+                    odd_even_ratios.append((odd_count, even_count))
+                    
+                    high_count = sum(1 for n in numbers if n > 45)
+                    low_count = len(numbers) - high_count
+                    high_low_ratios.append((low_count, high_count))
+                    
+                    sorted_nums = sorted(numbers)
+                    consecutive = 0
+                    for i in range(len(sorted_nums) - 1):
+                        if sorted_nums[i + 1] - sorted_nums[i] == 1:
+                            consecutive += 1
+                    consecutive_counts.append(consecutive)
+                    
+                    for num in numbers:
+                        decade_start = 1 + ((num - 1) // 10) * 10
+                        decade_key = f"{decade_start}-{decade_start+9}"
+                        decade_distributions[decade_key] += 1
+                
+                odd_even_counts = {"5-0": 0, "4-1": 0, "3-2": 0, "2-3": 0, "1-4": 0, "0-5": 0}
+                for odd, even in odd_even_ratios:
+                    key = f"{odd}-{even}"
+                    if key in odd_even_counts:
+                        odd_even_counts[key] += 1
+                    
+                high_low_counts = {"5-0": 0, "4-1": 0, "3-2": 0, "2-3": 0, "1-4": 0, "0-5": 0}
+                for low, high in high_low_ratios:
+                    key = f"{low}-{high}"
+                    if key in high_low_counts:
+                        high_low_counts[key] += 1
+                        
+                consecutive_distribution = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
+                for count in consecutive_counts:
+                    if count in consecutive_distribution:
+                        consecutive_distribution[count] += 1
+                        
+                for key in decade_distributions:
+                    decade_distributions[key] /= total_draws
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("<h4 style='text-align: center;'>Odd-Even Distribution</h4>", unsafe_allow_html=True)
+                    
+                    fig, ax = plt.subplots(figsize=(8, 5))
+                    patterns = list(odd_even_counts.keys())
+                    values = list(odd_even_counts.values())
+                    percentages = [v / total_draws * 100 for v in values]
+                    
+                    bars = ax.bar(patterns, percentages, color='#1e88e5')
+                    ax.set_ylabel('Percentage of Draws (%)')
+                    ax.set_title('Odd-Even Number Patterns')
+                    
+                    for i, v in enumerate(percentages):
+                        ax.text(i, v + 1, f"{v:.1f}%", ha='center')
+                    
+                    st.pyplot(fig)
+                    
+                    most_common_odd_even = max(odd_even_counts.items(), key=lambda x: x[1])
+                    st.markdown(f"<div style='text-align: center; padding: 10px; background-color: #f5f5f5; border-radius: 5px;'>"
+                                f"<b>Most common pattern:</b> {most_common_odd_even[0]} (Odd-Even) in {most_common_odd_even[1]} of {total_draws} draws "
+                                f"({most_common_odd_even[1]/total_draws*100:.1f}%)"
+                                f"</div>", 
+                                unsafe_allow_html=True)
+                
+                with col2:
+                    st.markdown("<h4 style='text-align: center;'>High-Low Distribution</h4>", unsafe_allow_html=True)
+                    
+                    fig, ax = plt.subplots(figsize=(8, 5))
+                    patterns = list(high_low_counts.keys())
+                    values = list(high_low_counts.values())
+                    percentages = [v / total_draws * 100 for v in values]
+                    
+                    bars = ax.bar(patterns, percentages, color='#4caf50')
+                    ax.set_ylabel('Percentage of Draws (%)')
+                    ax.set_title('Low (1-45) - High (46-90) Number Patterns')
+                    
+                    for i, v in enumerate(percentages):
+                        ax.text(i, v + 1, f"{v:.1f}%", ha='center')
+                    
+                    st.pyplot(fig)
+                    
+                    most_common_high_low = max(high_low_counts.items(), key=lambda x: x[1])
+                    st.markdown(f"<div style='text-align: center; padding: 10px; background-color: #f5f5f5; border-radius: 5px;'>"
+                                f"<b>Most common pattern:</b> {most_common_high_low[0]} (Low-High) in {most_common_high_low[1]} of {total_draws} draws "
+                                f"({most_common_high_low[1]/total_draws*100:.1f}%)"
+                                f"</div>", 
+                                unsafe_allow_html=True)
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("<h4 style='text-align: center;'>Consecutive Numbers</h4>", unsafe_allow_html=True)
+                    
+                    fig, ax = plt.subplots(figsize=(8, 5))
+                    patterns = list(consecutive_distribution.keys())
+                    values = list(consecutive_distribution.values())
+                    percentages = [v / total_draws * 100 for v in values]
+                    
+                    bars = ax.bar(patterns, percentages, color='#ff9800')
+                    ax.set_xlabel('Number of Consecutive Pairs')
+                    ax.set_ylabel('Percentage of Draws (%)')
+                    ax.set_title('Consecutive Number Pairs Distribution')
+                    
+                    for i, v in enumerate(percentages):
+                        ax.text(i, v + 1, f"{v:.1f}%", ha='center')
+                    
+                    st.pyplot(fig)
+                    
+                    most_common_consecutive = max(consecutive_distribution.items(), key=lambda x: x[1])
+                    st.markdown(f"<div style='text-align: center; padding: 10px; background-color: #f5f5f5; border-radius: 5px;'>"
+                                f"<b>Most common:</b> {most_common_consecutive[0]} consecutive pairs in {most_common_consecutive[1]} of {total_draws} draws "
+                                f"({most_common_consecutive[1]/total_draws*100:.1f}%)"
+                                f"</div>", 
+                                unsafe_allow_html=True)
+                
+                with col2:
+                    st.markdown("<h4 style='text-align: center;'>Number Range Distribution</h4>", unsafe_allow_html=True)
+                    
+                    fig, ax = plt.subplots(figsize=(8, 5))
+                    decades = list(decade_distributions.keys())
+                    values = list(decade_distributions.values())
+                    
+                    percentages = [v / 5 * 100 for v in values]
+                    
+                    bars = ax.bar(decades, percentages, color='#9c27b0')
+                    ax.set_xlabel('Number Range')
+                    ax.set_ylabel('Percentage (%)')
+                    ax.set_title('Number Range Distribution')
+                    plt.xticks(rotation=45)
+                    
+                    for i, v in enumerate(percentages):
+                        ax.text(i, v + 0.5, f"{v:.1f}%", ha='center')
+                    
+                    st.pyplot(fig)
+                    
+                    most_common_decade = max(decade_distributions.items(), key=lambda x: x[1])
+                    st.markdown(f"<div style='text-align: center; padding: 10px; background-color: #f5f5f5; border-radius: 5px;'>"
+                                f"<b>Most common range:</b> {most_common_decade[0]} appearing in {most_common_decade[1]/total_draws*100:.1f}% of draws"
+                                f"</div>", 
+                                unsafe_allow_html=True)
+                
+                st.markdown("<h4 style='text-align: center;'>Pattern Analysis Summary</h4>", unsafe_allow_html=True)
+                
+                summary_html = f"""
+                <table style='width: 100%; border-collapse: collapse; margin-top: 15px;'>
+                    <tr>
+                        <th style='border: 1px solid #ddd; padding: 12px; text-align: left; background-color: #1e88e5; color: white;'>Pattern Type</th>
+                        <th style='border: 1px solid #ddd; padding: 12px; text-align: left; background-color: #1e88e5; color: white;'>Common Patterns</th>
+                    </tr>
+                    <tr>
+                        <td style='border: 1px solid #ddd; padding: 12px;'><b>Odd-Even Balance</b></td>
+                        <td style='border: 1px solid #ddd; padding: 12px;'>
+                            Most draws have a {most_common_odd_even[0]} (Odd-Even) distribution<br>
+                            Odd number frequency: {sum([odd for odd, _ in odd_even_ratios])/(total_draws*5)*100:.1f}%<br>
+                            Even number frequency: {sum([even for _, even in odd_even_ratios])/(total_draws*5)*100:.1f}%
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style='border: 1px solid #ddd; padding: 12px;'><b>High-Low Balance</b></td>
+                        <td style='border: 1px solid #ddd; padding: 12px;'>
+                            Most draws have a {most_common_high_low[0]} (Low-High) distribution<br>
+                            Low numbers (1-45) frequency: {sum([low for low, _ in high_low_ratios])/(total_draws*5)*100:.1f}%<br>
+                            High numbers (46-90) frequency: {sum([high for _, high in high_low_ratios])/(total_draws*5)*100:.1f}%
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style='border: 1px solid #ddd; padding: 12px;'><b>Consecutive Numbers</b></td>
+                        <td style='border: 1px solid #ddd; padding: 12px;'>
+                            {consecutive_distribution[0]/total_draws*100:.1f}% of draws have no consecutive numbers<br>
+                            {sum([consecutive_distribution[i] for i in range(1,5)])/total_draws*100:.1f}% of draws have at least one consecutive pair<br>
+                            Average consecutive pairs per draw: {sum([i*consecutive_distribution[i] for i in consecutive_distribution])/total_draws:.2f}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style='border: 1px solid #ddd; padding: 12px;'><b>Number Range</b></td>
+                        <td style='border: 1px solid #ddd; padding: 12px;'>
+                            Most common range: {most_common_decade[0]} ({most_common_decade[1]/total_draws*5*100:.1f}% of all numbers)<br>
+                            Least common range: {min(decade_distributions.items(), key=lambda x: x[1])[0]} ({min(decade_distributions.values())/total_draws*5*100:.1f}% of all numbers)
+                        </td>
+                    </tr>
+                </table>
+                """
+                
+                st.markdown(summary_html, unsafe_allow_html=True)
+            else:
+                st.warning("No data available for pattern analysis. Please refresh data.")
     
     with tab3:
         if lotto_data.empty or most_frequent.empty or least_frequent.empty:
