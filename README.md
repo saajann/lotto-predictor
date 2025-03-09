@@ -2,7 +2,7 @@
 
 > No machine learning, just statistics.
 
-A streamlined web app for visualizing and analyzing Italian lotto draws using historical data.
+A streamlit web app for visualizing and analyzing Italian lotto draws using historical data.
 
 ## Overview
 
