@@ -679,8 +679,8 @@ def main():
                 top_delays = delay_df.head(10)
                 
                 delay_table = "<table style='width: 100%; border-collapse: collapse;'>"
-                delay_table += "<tr><th style='border: 1px solid #ddd; padding: 8px; background-color: #f44336; color: white;'>Number</th>"
-                delay_table += "<th style='border: 1px solid #ddd; padding: 8px; background-color: #f44336; color: white;'>Delay (days)</th></tr>"
+                delay_table += "<tr><th style='border: 1px solid #ddd; padding: 8px; background-color: #f44336; color: white; text-align: center;'>Number</th>"
+                delay_table += "<th style='border: 1px solid #ddd; padding: 8px; background-color: #f44336; color: white; text-align: center;'>Delay (days)</th></tr>"
                 
                 for _, row in top_delays.iterrows():
                     delay_table += f"<tr><td style='border: 1px solid #ddd; padding: 8px; text-align: center;'>{row['Number']}</td>"
@@ -694,8 +694,8 @@ def main():
                 recent_numbers = delay_df.tail(10).sort_values('Delay (days)')
                 
                 recent_table = "<table style='width: 100%; border-collapse: collapse;'>"
-                recent_table += "<tr><th style='border: 1px solid #ddd; padding: 8px; background-color: #4caf50; color: white;'>Number</th>"
-                recent_table += "<th style='border: 1px solid #ddd; padding: 8px; background-color: #4caf50; color: white;'>Delay (days)</th></tr>"
+                recent_table += "<tr><th style='border: 1px solid #ddd; padding: 8px; background-color: #4caf50; color: white; text-align: center;'>Number</th>"
+                recent_table += "<th style='border: 1px solid #ddd; padding: 8px; background-color: #4caf50; color: white; text-align: center;'>Delay (days)</th></tr>"
                 
                 for _, row in recent_numbers.iterrows():
                     recent_table += f"<tr><td style='border: 1px solid #ddd; padding: 8px; text-align: center;'>{row['Number']}</td>"
